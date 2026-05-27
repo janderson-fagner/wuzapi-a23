@@ -2027,6 +2027,70 @@ paths:
             application/json:
               schema:
                 example: { "code": 200, "data": { "Details": "Participants updated successfully" }, "success": true }
+  /group/requestparticipants:
+    get:
+      tags:
+        - Group
+      summary: List pending join requests
+      description: Lists participants who have requested to join the group. Requires join approval mode to be enabled and the session to be an admin of the group.
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: query
+          name: groupJID
+          schema:
+            type: string
+          required: true
+          description: The JID of the group
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": [ { "JID": "70072425046185@lid", "RequestedAt": "2026-05-27T00:34:40-03:00" } ], "success": true }
+  /group/updaterequestparticipants:
+    post:
+      tags:
+        - Group
+      summary: Approve or reject pending join requests
+      description: Approves or rejects participants who requested to join the group.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/definitions/UpdateGroupRequestParticipants'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "Details": "Group request participants updated successfully" }, "success": true }
+  /group/joinapprovalmode:
+    post:
+      tags:
+        - Group
+      summary: Toggle group join approval mode
+      description: Enables or disables the requirement that new members be approved by an admin before joining the group.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/definitions/SetGroupJoinApprovalMode'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "Details": "Group join approval mode updated successfully" }, "success": true }
 
 definitions:
   ContextInfo:
@@ -2992,6 +3056,44 @@ definitions:
           type: string
           description: List of participant JIDs (e.g., 5491112345678@s.whatsapp.net or 5491112345678)
         example: [ "5491112345678", "5491123456789@s.whatsapp.net" ]
+
+  UpdateGroupRequestParticipants:
+    type: object
+    required:
+      - GroupJID
+      - Action
+      - Phone
+    properties:
+      GroupJID:
+        type: string
+        description: The JID of the group
+        example: 120363312246943103@g.us
+      Action:
+        type: string
+        description: Action to perform ("approve" to accept join requests, "reject" to decline them)
+        enum: [approve, reject]
+        example: approve
+      Phone:
+        type: array
+        items:
+          type: string
+          description: List of requesting participant JIDs as returned by /group/requestparticipants (e.g. 70072425046185@lid)
+        example: [ "70072425046185@lid" ]
+
+  SetGroupJoinApprovalMode:
+    type: object
+    required:
+      - groupjid
+      - mode
+    properties:
+      groupjid:
+        type: string
+        description: The JID of the group
+        example: 120363312246943103@g.us
+      mode:
+        type: boolean
+        description: true to require admin approval for new members, false to disable it
+        example: true
 
   CreateGroup:
     type: object

@@ -158,6 +158,9 @@ func (s *server) routes() {
 	s.router.Handle("/group/join", c.Then(s.GroupJoin())).Methods("POST")
 	s.router.Handle("/group/inviteinfo", c.Then(s.GetGroupInviteInfo())).Methods("POST")
 	s.router.Handle("/group/updateparticipants", c.Then(s.UpdateGroupParticipants())).Methods("POST")
+	s.router.Handle("/group/requestparticipants", c.Then(s.GetGroupRequestParticipants())).Methods("GET")
+	s.router.Handle("/group/updaterequestparticipants", c.Then(s.UpdateGroupRequestParticipants())).Methods("POST")
+	s.router.Handle("/group/joinapprovalmode", c.Then(s.SetGroupJoinApprovalMode())).Methods("POST")
 
 	s.router.Handle("/newsletter/list", c.Then(s.ListNewsletter())).Methods("GET")
 
