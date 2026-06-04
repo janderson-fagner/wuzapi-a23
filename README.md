@@ -379,18 +379,24 @@ Check the [API Reference](https://github.com/asternic/wuzapi/blob/main/API.md)
     </a>
   </td>
 <td align="center">
+    <a href="https://github.com/ThiagoBauken">
+      <img src="https://avatars.githubusercontent.com/u/107090829?v=4" width="100px;" style="border-radius:50%;"/><br />
+      <sub><b>ThiagoBauken</b></sub>
+    </a>
+  </td>
+<td align="center">
     <a href="https://github.com/netrixken">
       <img src="https://avatars.githubusercontent.com/u/9066682?v=4" width="100px;" style="border-radius:50%;"/><br />
       <sub><b>netrixken</b></sub>
     </a>
   </td>
+</tr><tr>
 <td align="center">
     <a href="https://github.com/luizrgf2">
       <img src="https://avatars.githubusercontent.com/u/71092163?v=4" width="100px;" style="border-radius:50%;"/><br />
       <sub><b>luizrgf2</b></sub>
     </a>
   </td>
-</tr><tr>
 <td align="center">
     <a href="https://github.com/andreydruz">
       <img src="https://avatars.githubusercontent.com/u/976438?v=4" width="100px;" style="border-radius:50%;"/><br />
@@ -421,13 +427,13 @@ Check the [API Reference](https://github.com/asternic/wuzapi/blob/main/API.md)
       <sub><b>igortrinidad</b></sub>
     </a>
   </td>
+</tr><tr>
 <td align="center">
     <a href="https://github.com/chrsmendes">
       <img src="https://avatars.githubusercontent.com/u/77082167?v=4" width="100px;" style="border-radius:50%;"/><br />
       <sub><b>chrsmendes</b></sub>
     </a>
   </td>
-</tr><tr>
 <td align="center">
     <a href="https://github.com/jeffersonfelixdev">
       <img src="https://avatars.githubusercontent.com/u/3003222?v=4" width="100px;" style="border-radius:50%;"/><br />
@@ -458,13 +464,13 @@ Check the [API Reference](https://github.com/asternic/wuzapi/blob/main/API.md)
       <sub><b>joaosouz4dev</b></sub>
     </a>
   </td>
+</tr><tr>
 <td align="center">
     <a href="https://github.com/gusnips">
       <img src="https://avatars.githubusercontent.com/u/981265?v=4" width="100px;" style="border-radius:50%;"/><br />
       <sub><b>gusnips</b></sub>
     </a>
   </td>
-</tr><tr>
 <td align="center">
     <a href="https://github.com/anilgulecha">
       <img src="https://avatars.githubusercontent.com/u/1016984?v=4" width="100px;" style="border-radius:50%;"/><br />
@@ -487,12 +493,6 @@ Check the [API Reference](https://github.com/asternic/wuzapi/blob/main/API.md)
     <a href="https://github.com/Jwenqiang">
       <img src="https://avatars.githubusercontent.com/u/20280001?v=4" width="100px;" style="border-radius:50%;"/><br />
       <sub><b>Jwenqiang</b></sub>
-    </a>
-  </td>
-<td align="center">
-    <a href="https://github.com/cadao7">
-      <img src="https://avatars.githubusercontent.com/u/306330?v=4" width="100px;" style="border-radius:50%;"/><br />
-      <sub><b>cadao7</b></sub>
     </a>
   </td>
 </tr></table>
