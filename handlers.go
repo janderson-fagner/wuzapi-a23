@@ -1209,6 +1209,21 @@ func (s *server) SendAudio() http.HandlerFunc {
 	}
 }
 
+// jpegThumbnail resizes img to fit within width x height (preserving aspect
+// ratio) and returns it JPEG-encoded. It encodes in memory, so there is no temp
+// file to leak.
+func jpegThumbnail(img image.Image, width, height uint) ([]byte, error) {
+	if img == nil {
+		return nil, errors.New("cannot create thumbnail from a nil image")
+	}
+	thumb := resize.Thumbnail(width, height, img, resize.Lanczos3)
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, thumb, nil); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 // Sends an Image message
 func (s *server) SendImage() http.HandlerFunc {
 
@@ -1312,25 +1327,11 @@ func (s *server) SendImage() http.HandlerFunc {
 			return
 		}
 
-		// resize to width 72 using Lanczos resampling and preserve aspect ratio
-		m := resize.Thumbnail(72, 72, img, resize.Lanczos3)
-
-		tmpFile, err := os.CreateTemp("", "resized-*.jpg")
+		// resize to 72x72 (preserving aspect ratio) and encode the thumbnail in
+		// memory — no temp file, so there is nothing to leak.
+		thumbnailBytes, err = jpegThumbnail(img, 72, 72)
 		if err != nil {
-			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Could not create temp file for thumbnail: %v", err)))
-			return
-		}
-		defer tmpFile.Close()
-
-		// write new image to file
-		if err := jpeg.Encode(tmpFile, m, nil); err != nil {
-			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Failed to encode jpeg: %v", err)))
-			return
-		}
-
-		thumbnailBytes, err = os.ReadFile(tmpFile.Name())
-		if err != nil {
-			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Failed to read %s: %v", tmpFile.Name(), err)))
+			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("Failed to encode jpeg thumbnail: %v", err)))
 			return
 		}
 
