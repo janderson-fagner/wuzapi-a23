@@ -30,6 +30,10 @@ services:
         condition: service_healthy
     networks:
       - wuzapi-network
+    volumes:
+      # Per-user files dir (files/user_<id>/). Persists across rebuilds and
+      # lets you drop files on the host to send them via "file:<name>".
+      - ./files:/app/files
     restart: unless-stopped
 
   db:
