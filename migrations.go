@@ -159,7 +159,7 @@ BEGIN
     END IF;
     
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'media_delivery') THEN
-        ALTER TABLE users ADD COLUMN media_delivery TEXT DEFAULT 'base64';
+        ALTER TABLE users ADD COLUMN media_delivery TEXT DEFAULT 'local';
     END IF;
     
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 's3_retention_days') THEN
@@ -392,7 +392,7 @@ func applyMigration(db *sqlx.DB, migration Migration) error {
 				err = addColumnIfNotExistsSQLite(tx, "users", "s3_public_url", "TEXT DEFAULT ''")
 			}
 			if err == nil {
-				err = addColumnIfNotExistsSQLite(tx, "users", "media_delivery", "TEXT DEFAULT 'base64'")
+				err = addColumnIfNotExistsSQLite(tx, "users", "media_delivery", "TEXT DEFAULT 'local'")
 			}
 			if err == nil {
 				err = addColumnIfNotExistsSQLite(tx, "users", "s3_retention_days", "INTEGER DEFAULT 30")

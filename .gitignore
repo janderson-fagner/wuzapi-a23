@@ -2,6 +2,7 @@ dbdata/
 files/
 wuzapi
 .env
+.env.backup
 .tool-versions
 
 # Added by Claude Task Master

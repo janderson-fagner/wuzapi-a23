@@ -381,6 +381,12 @@ func (ss *stdioServer) routeRequest(req *jsonRpcRequest) {
 	case "user.avatar":
 		httpMethod = "POST"
 		httpPath = "/user/avatar"
+	case "user.block":
+		httpMethod = "POST"
+		httpPath = "/user/block"
+	case "user.unblock":
+		httpMethod = "POST"
+		httpPath = "/user/unblock"
 	case "user.lid":
 		httpMethod = "GET"
 		jid, ok := req.Params["jid"].(string)
@@ -465,6 +471,40 @@ func (ss *stdioServer) routeRequest(req *jsonRpcRequest) {
 	case "webhook.delete":
 		httpMethod = "DELETE"
 		httpPath = "/webhook"
+
+	// Chat management
+	case "chat.list":
+		httpMethod = "GET"
+		httpPath = "/chat/list"
+	case "chat.markunread":
+		httpMethod = "POST"
+		httpPath = "/chat/markunread"
+	case "chat.pin":
+		httpMethod = "POST"
+		httpPath = "/chat/pin"
+
+	// Labels
+	case "label.edit":
+		httpMethod = "POST"
+		httpPath = "/label/edit"
+	case "label.chat":
+		httpMethod = "POST"
+		httpPath = "/label/chat"
+	case "label.message":
+		httpMethod = "POST"
+		httpPath = "/label/message"
+
+	// Media
+	case "media.get":
+		httpMethod = "GET"
+		userid, _ := req.Params["userid"].(string)
+		filename, _ := req.Params["filename"].(string)
+		token, _ := req.Params["token"].(string)
+		if userid == "" || filename == "" || token == "" {
+			ss.sendError(req.ID, 400, "missing userid, filename, or token parameter")
+			return
+		}
+		httpPath = "/media/" + userid + "/" + filename + "?token=" + token
 
 	default:
 		ss.sendError(req.ID, 404, fmt.Sprintf("unknown method: %s", req.Method))

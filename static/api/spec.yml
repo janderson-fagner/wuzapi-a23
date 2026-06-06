@@ -87,6 +87,50 @@ paths:
                 required:
                   - status
                   - timestamp
+  /media/{userid}/{filename}:
+    get:
+      tags:
+        - System
+      summary: Serve local media file
+      description: |
+        Serves media files stored locally when `media_delivery` is set to `local`.
+        The webhook payload includes a `mediaURL` with the authentication token already appended.
+        Requires the user's API token as a query parameter.
+      parameters:
+        - name: userid
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "User directory identifier (e.g. user_1)"
+          example: "user_1"
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+          description: "Media filename (message ID + extension)"
+          example: "3EB0A1B2C3D4E5F6.jpg"
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "User API token for authentication"
+      responses:
+        200:
+          description: Media file content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        400:
+          description: Invalid filename or userid
+        401:
+          description: Missing or invalid token
+        404:
+          description: File not found
   /admin/users:
     get:
       tags:
@@ -371,6 +415,14 @@ paths:
             application/json:
               schema:
                 example: { "code": 200, "data": { "Details": "Disconnected" }, "success": true }
+      parameters:
+        - name: clear
+          in: query
+          required: false
+          description: If true, also clears the user's event subscriptions on disconnect. Defaults to false, which preserves them.
+          schema:
+            type: boolean
+            example: false
   /session/logout:
     post:
       tags:
@@ -841,7 +893,64 @@ paths:
             application/json:
               schema:
                 example: { "code": 200, "data": { "5491122223333@s.whatsapp.net": { "BusinessName": "", "FirstName": "", "Found": true, "FullName": "", "PushName": "FOP2" }, "549113334444@s.whatsapp.net": { "BusinessName": "", "FirstName": "", "Found": true, "FullName": "", "PushName": "Asternic" } } }
-  /user/lid/{phone}:
+  /user/block:
+    post:
+      tags:
+        - User
+      summary: Block a WhatsApp user
+      description: Blocks a WhatsApp user and returns the updated blocklist.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/definitions/BlocklistUpdate'
+      responses:
+        200:
+          description: User blocked
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "Details": "User blocked", "JID": "5491155553935@s.whatsapp.net", "Blocklist": [ "5491155553935@s.whatsapp.net" ], "DHash": "1234567890" }, "success": true }
+  /user/unblock:
+    post:
+      tags:
+        - User
+      summary: Unblock a WhatsApp user
+      description: Unblocks a WhatsApp user and returns the updated blocklist.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/definitions/BlocklistUpdate'
+      responses:
+        200:
+          description: User unblocked
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "Details": "User unblocked", "JID": "5491155553935@s.whatsapp.net", "Blocklist": [], "DHash": "1234567891" }, "success": true }
+  /user/blocklist:
+    get:
+      tags:
+        - User
+      summary: Get the current blocklist
+      description: Returns the list of WhatsApp users currently blocked by the session.
+      security:
+        - ApiKeyAuth: []
+      responses:
+        200:
+          description: Current blocklist
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "Blocklist": [ "5491155553935@s.whatsapp.net" ], "DHash": "1234567890" }, "success": true }
+  /user/lid/{jid}:
     get:
       tags:
         - User
@@ -850,7 +959,7 @@ paths:
         Returns the **JID** (WhatsApp ID) and **LID** (Linked Device ID) associated with a given phone number.
         <br>Use this endpoint to identify contacts within WhatsApp.
       parameters:
-        - name: phone
+        - name: jid
           in: path
           required: true
           description: Phone number in international format (without the + sign)
@@ -881,6 +990,48 @@ paths:
           description: Invalid or missing token
         404:
           description: User not found
+  /user/privacy:
+    get:
+      tags:
+        - User
+      summary: Get privacy settings
+      description: Returns the account's current privacy settings (last seen, profile photo, status, read receipts, online, groups, calls).
+      security:
+        - ApiKeyAuth: []
+      responses:
+        200:
+          description: Current privacy settings
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "GroupAdd": "contacts", "LastSeen": "all", "Status": "contacts", "Profile": "all", "ReadReceipts": "all", "CallAdd": "all", "Online": "all", "Messages": "all", "Defense": "off", "Stickers": "contacts" }, "success": true }
+    post:
+      tags:
+        - User
+      summary: Set a privacy setting
+      description: |
+        Updates a single privacy setting. Valid Name/Value combinations:
+        <br>`groupadd`, `last`, `status`, `profile`: `all`, `contacts`, `contact_blacklist`, `none`
+        <br>`readreceipts`: `all`, `none`
+        <br>`online`: `all`, `match_last_seen`
+        <br>`calladd`: `all`, `known`
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              example: { "Name": "last", "Value": "contacts" }
+      responses:
+        200:
+          description: Updated privacy settings
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "LastSeen": "contacts" }, "success": true }
+        400:
+          description: Invalid privacy setting name or value
   /chat/delete:
     post:
       tags:
@@ -925,6 +1076,99 @@ paths:
             application/json:
               schema:
                 example: { "code": 200, "data": { "Details": "Message(s) marked as read" }, "success": true }
+  /chat/list:
+    get:
+      tags:
+        - Chat
+      summary: List chats
+      description: Returns a list of chats from message history for the authenticated user, enriched with contact names. Results are ordered by most recent message.
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of chats to return
+          required: false
+          schema:
+            type: integer
+            default: 100
+      responses:
+        200:
+          description: Response
+          content:
+            application/json:
+              schema:
+                example:
+                  code: 200
+                  data:
+                    - chat_jid: "5491155553934@s.whatsapp.net"
+                      last_message_time: "2024-12-25T10:30:00Z"
+                      message_count: 42
+                      name: "John Doe"
+                  success: true
+  /chat/archive:
+    post:
+      tags:
+        - Chat
+      summary: Archive or unarchive a chat
+      description: Archives or unarchives a chat in WhatsApp
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/definitions/ArchiveChat'
+      responses:
+        200:
+          description: Response
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "success": true, "message": "Chat archived" }, "success": true }
+  /chat/markunread:
+    post:
+      tags:
+        - Chat
+      summary: Mark chat as unread
+      description: Marks a chat as unread in WhatsApp
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/definitions/MarkUnread'
+      responses:
+        200:
+          description: Response
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "success": true, "message": "Chat marked as unread" }, "success": true }
+  /chat/pin:
+    post:
+      tags:
+        - Chat
+      summary: Pin or unpin a chat
+      description: Pins or unpins a chat in WhatsApp
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/definitions/PinChat'
+      responses:
+        200:
+          description: Response
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "success": true, "message": "Chat pinned" }, "success": true }
   /chat/react:
     post:
       tags:
@@ -2027,6 +2271,134 @@ paths:
             application/json:
               schema:
                 example: { "code": 200, "data": { "Details": "Participants updated successfully" }, "success": true }
+  /group/requestparticipants:
+    get:
+      tags:
+        - Group
+      summary: List pending join requests
+      description: Lists participants who have requested to join the group. Requires join approval mode to be enabled and the session to be an admin of the group.
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: query
+          name: groupJID
+          schema:
+            type: string
+          required: true
+          description: The JID of the group
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": [ { "JID": "70072425046185@lid", "RequestedAt": "2026-05-27T00:34:40-03:00" } ], "success": true }
+  /group/updaterequestparticipants:
+    post:
+      tags:
+        - Group
+      summary: Approve or reject pending join requests
+      description: Approves or rejects participants who requested to join the group.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/definitions/UpdateGroupRequestParticipants'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "Details": "Group request participants updated successfully" }, "success": true }
+  /group/joinapprovalmode:
+    post:
+      tags:
+        - Group
+      summary: Toggle group join approval mode
+      description: Enables or disables the requirement that new members be approved by an admin before joining the group.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/definitions/SetGroupJoinApprovalMode'
+      responses:
+        200:
+          description: Success
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "Details": "Group join approval mode updated successfully" }, "success": true }
+
+  /label/edit:
+    post:
+      tags:
+        - Label
+      summary: Create or edit a label
+      description: Creates a new label, updates an existing one, or deletes it (WhatsApp Business feature)
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/definitions/LabelEdit'
+      responses:
+        200:
+          description: Response
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "success": true, "message": "Label updated" }, "success": true }
+  /label/chat:
+    post:
+      tags:
+        - Label
+      summary: Assign or remove a label from a chat
+      description: Assigns a label to a chat or removes it (WhatsApp Business feature)
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/definitions/LabelChat'
+      responses:
+        200:
+          description: Response
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "success": true, "message": "Label assigned to chat" }, "success": true }
+  /label/message:
+    post:
+      tags:
+        - Label
+      summary: Assign or remove a label from a message
+      description: Assigns a label to a specific message or removes it (WhatsApp Business feature)
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/definitions/LabelMessage'
+      responses:
+        200:
+          description: Response
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "success": true, "message": "Label assigned to message" }, "success": true }
 
 definitions:
   ContextInfo:
@@ -2330,6 +2702,20 @@ definitions:
       type:
         type: string
         example: available
+  BlocklistUpdate:
+    type: object
+    properties:
+      Phone:
+        type: string
+        example: "5491155553935"
+      JID:
+        type: string
+        example: "5491155553935@s.whatsapp.net"
+    oneOf:
+      - required:
+          - Phone
+      - required:
+          - JID
   MessageContact:
     type: object
     required: 
@@ -2425,9 +2811,7 @@ definitions:
     type: object
     required:
       - Phone
-      - ButtonText
       - Desc
-      - TopText
     properties:
       Phone:
         type: string
@@ -2435,29 +2819,27 @@ definitions:
         description: Recipient phone number or JID
       ButtonText:
         type: string
-        example: View Options
-        description: Text on the open-list button
+        example: "Click Here"
       Desc:
         type: string
-        example: Browse our catalog
-        description: Message body/description text
+        example: "This is a list"
       TopText:
         type: string
-        example: Product Catalog
-        description: Header/title text
+        example: "This is a list"
       FooterText:
         type: string
-        example: Tap to see options
-        description: Optional footer text
+        example: "This is a footer text"
+      Id:
+        type: string
+        example: "ABCDABCD1234"
       Sections:
         type: array
-        description: Array of section objects (preferred over List)
         items:
           type: object
           properties:
             title:
               type: string
-              example: Electronics
+              example: "Menu"
             rows:
               type: array
               items:
@@ -2465,13 +2847,13 @@ definitions:
                 properties:
                   title:
                     type: string
-                    example: Smartphones
+                    example: "menu option 1"
                   desc:
                     type: string
-                    example: Latest models
+                    example: "long description"
                   RowId:
                     type: string
-                    example: phone
+                    example: "1"
       List:
         type: array
         description: Flat array of items (legacy, creates single section). Use Sections instead.
@@ -2480,22 +2862,31 @@ definitions:
           properties:
             title:
               type: string
-              example: menu button 1
+              example: "menu option 1"
             desc:
               type: string
-              example: long description
+              example: "long description"
             RowId:
               type: string
               example: "1"
-      Id:
-        type: string
-        example: "ABCDABCD1234"
-        description: Optional custom message ID
+      ContextInfo:
+        type: object
+        required:
+          - StanzaID
+          - Participant
+        properties:
+          StanzaID:
+            type: string
+            example: "3EB06F9067F80BAB89FF"
+          Participant:
+            type: string
+            example: "5491155553935@s.whatsapp.net"
 
   MessageButtons:
     type: object
     required:
       - Phone
+      - Body
       - Buttons
     properties:
       Phone:
@@ -2504,36 +2895,56 @@ definitions:
         description: Recipient phone number or JID
       Text:
         type: string
-        example: Choose an option
-        description: Message body text. If empty, Title is used as body (legacy)
+        example: "How you doin"
       Title:
         type: string
-        example: Quick Actions
-        description: Header text displayed above body. If Text is empty, used as body for backwards compatibility
+        example: "Main menu"
       Footer:
         type: string
-        example: Tap a button to continue
-        description: Optional footer text
-      Buttons:
-        type: array
-        description: Array of button objects (max 3)
-        items:
-          type: object
-          required:
-            - ButtonText
-          properties:
-            ButtonId:
-              type: string
-              example: help
-              description: Unique button ID (defaults to ButtonText if empty)
-            ButtonText:
-              type: string
-              example: Help
-              description: Display text on the button
+        example: "Choose an option"
+      Image:
+        type: string
+        example: "https://example.com/image.jpg"
       Id:
         type: string
         example: "ABCDABCD1234"
-        description: Optional custom message ID
+      Buttons:
+        type: array
+        minItems: 1
+        maxItems: 5
+        items:
+          type: object
+          properties:
+            type:
+              type: string
+              example: "reply" # reply | cta_url | cta_call | copy
+            title:
+              type: string
+              example: "Confirm"
+            id:
+              type: string
+              example: "btn_confirm"
+            url:
+              type: string
+              example: "https://example.com"
+            phone_number:
+              type: string
+              example: "+5511999999999"
+            copy_code:
+              type: string
+              example: "PROMO2024"
+      ContextInfo:
+        type: object
+        required:
+          - StanzaID
+          - Participant
+        properties:
+          StanzaID:
+            type: string
+            example: "3EB06F9067F80BAB89FF"
+          Participant:
+            type: string
+            example: "5491155553935@s.whatsapp.net"
 
   MessagePix:
     type: object
@@ -3085,6 +3496,44 @@ definitions:
           description: List of participant JIDs (e.g., 5491112345678@s.whatsapp.net or 5491112345678)
         example: [ "5491112345678", "5491123456789@s.whatsapp.net" ]
 
+  UpdateGroupRequestParticipants:
+    type: object
+    required:
+      - GroupJID
+      - Action
+      - Phone
+    properties:
+      GroupJID:
+        type: string
+        description: The JID of the group
+        example: 120363312246943103@g.us
+      Action:
+        type: string
+        description: Action to perform ("approve" to accept join requests, "reject" to decline them)
+        enum: [approve, reject]
+        example: approve
+      Phone:
+        type: array
+        items:
+          type: string
+          description: List of requesting participant JIDs as returned by /group/requestparticipants (e.g. 70072425046185@lid)
+        example: [ "70072425046185@lid" ]
+
+  SetGroupJoinApprovalMode:
+    type: object
+    required:
+      - groupjid
+      - mode
+    properties:
+      groupjid:
+        type: string
+        description: The JID of the group
+        example: 120363312246943103@g.us
+      mode:
+        type: boolean
+        description: true to require admin approval for new members, false to disable it
+        example: true
+
   CreateGroup:
     type: object
     required:
@@ -3181,12 +3630,114 @@ definitions:
       media_delivery:
         type: string
         description: Media delivery method
-        enum: ["base64", "s3", "both"]
+        enum: ["base64", "s3", "both", "local"]
         example: "both"
       retention_days:
         type: integer
         description: Number of days to retain files (0 for no expiration)
         example: 30
+
+  ArchiveChat:
+    type: object
+    required:
+      - jid
+      - archive
+    properties:
+      jid:
+        type: string
+        example: "5491155553934@s.whatsapp.net"
+        description: "Chat JID to archive/unarchive"
+      archive:
+        type: boolean
+        example: true
+        description: "true to archive, false to unarchive"
+  MarkUnread:
+    type: object
+    required:
+      - jid
+    properties:
+      jid:
+        type: string
+        example: "5491155553934@s.whatsapp.net"
+        description: "Chat JID to mark as unread"
+  PinChat:
+    type: object
+    required:
+      - jid
+      - pin
+    properties:
+      jid:
+        type: string
+        example: "5491155553934@s.whatsapp.net"
+        description: "Chat JID to pin/unpin"
+      pin:
+        type: boolean
+        example: true
+        description: "true to pin, false to unpin"
+  LabelEdit:
+    type: object
+    required:
+      - label_id
+    properties:
+      label_id:
+        type: string
+        example: "1"
+        description: "Label identifier"
+      label_name:
+        type: string
+        example: "Important"
+        description: "Display name for the label"
+      label_color:
+        type: integer
+        example: 0
+        description: "Color index for the label"
+      deleted:
+        type: boolean
+        example: false
+        description: "Set to true to delete the label"
+  LabelChat:
+    type: object
+    required:
+      - jid
+      - label_id
+      - labeled
+    properties:
+      jid:
+        type: string
+        example: "5491155553934@s.whatsapp.net"
+        description: "Chat JID"
+      label_id:
+        type: string
+        example: "1"
+        description: "Label identifier"
+      labeled:
+        type: boolean
+        example: true
+        description: "true to assign label, false to remove"
+  LabelMessage:
+    type: object
+    required:
+      - jid
+      - label_id
+      - message_id
+      - labeled
+    properties:
+      jid:
+        type: string
+        example: "5491155553934@s.whatsapp.net"
+        description: "Chat JID where the message is"
+      label_id:
+        type: string
+        example: "1"
+        description: "Label identifier"
+      message_id:
+        type: string
+        example: "3EB06F9067F80BAB89FF"
+        description: "Message identifier"
+      labeled:
+        type: boolean
+        example: true
+        description: "true to assign label, false to remove"
 
 components:
   securitySchemes:

@@ -131,6 +131,42 @@ Response:
 
 ---
 
+## Serve Local Media
+
+Serves media files stored locally when `media_delivery` is set to `local`. Requires the user's API token as a query parameter for authentication. The webhook payload includes a `mediaURL` with the token already appended.
+
+Endpoint: _/media/{userid}/{filename}_
+
+Method: **GET**
+
+| Parameter | Type   | Description                                   |
+|-----------|--------|-----------------------------------------------|
+| userid    | string | User directory identifier (e.g. `user_1`)     |
+| filename  | string | Media filename (message ID + extension)       |
+| token     | string | User API token (query parameter, required)    |
+
+**curl example:**
+
+```bash
+curl "http://localhost:8080/media/user_1/3EB0A1B2C3D4E5F6.jpg?token=1234ABCD" --output image.jpg
+```
+
+**Responses:**
+
+| Code | Description            |
+|------|------------------------|
+| 200  | Media file content     |
+| 400  | Invalid filename/userid|
+| 401  | Missing or invalid token|
+| 404  | File not found         |
+
+**Environment variables:**
+
+- `WUZAPI_BASE_URL`: Override the base URL used in webhook `mediaURL` fields (useful behind proxy/ngrok). Default: `http://{address}:{port}`.
+- `WEBHOOK_TIMEOUT`: Webhook HTTP client timeout in seconds. Default: `30`.
+
+---
+
 ## Webhook
 
 The following _webhook_ endpoints are used to get or set the webhook that will be called whenever a message or event is received. Available event types are:
@@ -374,9 +410,15 @@ Response:
 Disconnects from Whatsapp servers, keeping the session active. This means that if you /session/connect again, it will
 reuse the session and won't require a QR code rescan.
 
+Event subscriptions are **preserved by default**. Pass `clear=true` to also reset them on disconnect.
+
 Endpoint: _/session/disconnect_
 
 Method: **POST**
+
+Query parameters:
+
+* `clear` (optional, boolean): if `true`, clears the user's event subscriptions on disconnect. Defaults to `false` (subscriptions preserved).
 
 
 ```
@@ -632,6 +674,165 @@ Response:
       "PushName": "Asternic"
     }
   }
+}
+```
+
+---
+
+## Get Privacy Settings
+
+Returns the account's current privacy settings.
+
+Endpoint: _/user/privacy_
+
+Method: **GET**
+
+```
+curl -s -X GET -H 'Token: 1234ABCD' http://localhost:8080/user/privacy
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "GroupAdd": "contacts",
+    "LastSeen": "all",
+    "Status": "contacts",
+    "Profile": "all",
+    "ReadReceipts": "all",
+    "CallAdd": "all",
+    "Online": "all",
+    "Messages": "all",
+    "Defense": "off",
+    "Stickers": "contacts"
+  },
+  "success": true
+}
+```
+
+---
+
+## Set Privacy Setting
+
+Updates a single privacy setting.
+
+Endpoint: _/user/privacy_
+
+Method: **POST**
+
+Valid `Name` / `Value` combinations:
+
+| Name | Valid values |
+|------|--------------|
+| `groupadd`, `last`, `status`, `profile` | `all`, `contacts`, `contact_blacklist`, `none` |
+| `readreceipts` | `all`, `none` |
+| `online` | `all`, `match_last_seen` |
+| `calladd` | `all`, `known` |
+
+```
+curl -s -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' --data '{"Name":"last","Value":"contacts"}' http://localhost:8080/user/privacy
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "LastSeen": "contacts"
+  },
+  "success": true
+}
+```
+
+---
+
+## Block User
+
+Blocks a WhatsApp user and returns the updated blocklist.
+
+Endpoint: _/user/block_
+
+Method: **POST**
+
+```
+curl -s -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' --data '{"Phone":"5491155554445"}' http://localhost:8080/user/block
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "Details": "User blocked",
+    "JID": "5491155554445@s.whatsapp.net",
+    "Blocklist": [
+      "5491155554445@s.whatsapp.net"
+    ],
+    "DHash": "1234567890"
+  },
+  "success": true
+}
+```
+
+---
+
+## Unblock User
+
+Unblocks a WhatsApp user and returns the updated blocklist.
+
+Endpoint: _/user/unblock_
+
+Method: **POST**
+
+```
+curl -s -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' --data '{"Phone":"5491155554445"}' http://localhost:8080/user/unblock
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "Details": "User unblocked",
+    "JID": "5491155554445@s.whatsapp.net",
+    "Blocklist": [],
+    "DHash": "1234567891"
+  },
+  "success": true
+}
+```
+
+---
+
+## Get Blocklist
+
+Returns the list of WhatsApp users currently blocked by the session.
+
+Endpoint: _/user/blocklist_
+
+Method: **GET**
+
+```
+curl -s -X GET -H 'Token: 1234ABCD' http://localhost:8080/user/blocklist
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "Blocklist": [
+      "5491155554445@s.whatsapp.net"
+    ],
+    "DHash": "1234567890"
+  },
+  "success": true
 }
 ```
 
@@ -981,6 +1182,276 @@ method: **POST**
 
 ```
 curl -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' --data '{"Id":["AABBCCDD112233", "IIOOPPLL43332"], "ChatPhone":"5491155553934", "SenderPhone":"5491155553935"}' http://localhost:8080/chat/markread
+```
+
+---
+
+## List Chats
+
+Returns a list of chats from message history for the authenticated user, enriched with contact names. Results are ordered by most recent message.
+
+endpoint: _/chat/list_
+
+method: **GET**
+
+**Query Parameters:**
+- `limit` (optional): Maximum number of chats to return (default: 100)
+
+```
+curl -s -X GET -H 'Token: 1234ABCD' http://localhost:8080/chat/list?limit=50
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": [
+    {
+      "chat_jid": "5491155553934@s.whatsapp.net",
+      "last_message_time": "2024-12-25T10:30:00Z",
+      "message_count": 42,
+      "name": "John Doe"
+    },
+    {
+      "chat_jid": "120362023605733675@g.us",
+      "last_message_time": "2024-12-24T18:00:00Z",
+      "message_count": 150,
+      "name": "Super Group"
+    }
+  ],
+  "success": true
+}
+```
+
+---
+
+## Archive/Unarchive chat
+
+Archives or unarchives a chat in WhatsApp.
+
+endpoint: _/chat/archive_
+
+method: **POST**
+
+| Param   | Required | Description |
+|---------|----------|-------------|
+| jid     | Yes      | Chat JID to archive/unarchive |
+| archive | Yes      | `true` to archive, `false` to unarchive |
+
+```
+curl -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' --data '{"jid":"5491155553934@s.whatsapp.net","archive":true}' http://localhost:8080/chat/archive
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "success": true,
+    "message": "Chat archived"
+  },
+  "success": true
+}
+```
+
+---
+
+## Mark chat as unread
+
+Marks a chat as unread in WhatsApp.
+
+endpoint: _/chat/markunread_
+
+method: **POST**
+
+| Param | Required | Description |
+|-------|----------|-------------|
+| jid   | Yes      | Chat JID to mark as unread |
+
+```
+curl -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' --data '{"jid":"5491155553934@s.whatsapp.net"}' http://localhost:8080/chat/markunread
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "success": true,
+    "message": "Chat marked as unread"
+  },
+  "success": true
+}
+```
+
+---
+
+## Pin/Unpin chat
+
+Pins or unpins a chat in WhatsApp.
+
+endpoint: _/chat/pin_
+
+method: **POST**
+
+| Param | Required | Description |
+|-------|----------|-------------|
+| jid   | Yes      | Chat JID to pin/unpin |
+| pin   | Yes      | `true` to pin, `false` to unpin |
+
+```
+curl -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' --data '{"jid":"5491155553934@s.whatsapp.net","pin":true}' http://localhost:8080/chat/pin
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "success": true,
+    "message": "Chat pinned"
+  },
+  "success": true
+}
+```
+
+---
+
+## Labels
+
+The following _label_ endpoints allow you to manage WhatsApp labels (available on WhatsApp Business).
+
+## Create/Edit label
+
+Creates a new label or edits an existing one.
+
+endpoint: _/label/edit_
+
+method: **POST**
+
+| Param       | Required | Description |
+|-------------|----------|-------------|
+| label_id    | Yes      | Label identifier |
+| label_name  | No       | Display name for the label |
+| label_color | No       | Color index for the label |
+| deleted     | No       | Set to `true` to delete the label |
+
+```
+curl -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' --data '{"label_id":"1","label_name":"Important","label_color":0,"deleted":false}' http://localhost:8080/label/edit
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "success": true,
+    "message": "Label updated"
+  },
+  "success": true
+}
+```
+
+---
+
+## Assign/Remove label from chat
+
+Assigns a label to a chat or removes it.
+
+endpoint: _/label/chat_
+
+method: **POST**
+
+| Param    | Required | Description |
+|----------|----------|-------------|
+| jid      | Yes      | Chat JID |
+| label_id | Yes      | Label identifier |
+| labeled  | Yes      | `true` to assign, `false` to remove |
+
+```
+curl -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' --data '{"jid":"5491155553934@s.whatsapp.net","label_id":"1","labeled":true}' http://localhost:8080/label/chat
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "success": true,
+    "message": "Label assigned to chat"
+  },
+  "success": true
+}
+```
+
+---
+
+## Assign/Remove label from message
+
+Assigns a label to a specific message or removes it.
+
+endpoint: _/label/message_
+
+method: **POST**
+
+| Param      | Required | Description |
+|------------|----------|-------------|
+| jid        | Yes      | Chat JID where the message is |
+| label_id   | Yes      | Label identifier |
+| message_id | Yes      | Message identifier |
+| labeled    | Yes      | `true` to assign, `false` to remove |
+
+```
+curl -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' --data '{"jid":"5491155553934@s.whatsapp.net","label_id":"1","message_id":"3EB06F9067F80BAB89FF","labeled":true}' http://localhost:8080/label/message
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "success": true,
+    "message": "Label assigned to message"
+  },
+  "success": true
+}
+```
+
+---
+
+## Set Status Message
+
+Updates the current user's status text, which is shown in the "About" section in the user profile.
+
+endpoint: _/status/set/text_
+
+method: **POST**
+
+| Param | Required | Description |
+|-------|----------|-------------|
+| Body  | Yes      | Status text to set |
+
+```
+curl -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' --data '{"Body":"Hello World"}' http://localhost:8080/status/set/text
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "Details": "Set"
+  },
+  "success": true
+}
 ```
 
 ---
@@ -1395,6 +1866,89 @@ Response:
 }
 ```
 
+---
+
+## List pending join requests
+
+Lists participants who have requested to join the group. Requires join approval mode to be enabled on the group and the session to be a group admin.
+
+endpoint: _/group/requestparticipants_
+
+method: **GET**
+
+```
+curl -s -X GET -H 'Token: 1234ABCD' 'http://localhost:8080/group/requestparticipants?groupJID=120362023605733675@g.us'
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": [
+    {
+      "JID": "70072425046185@lid",
+      "RequestedAt": "2026-05-27T00:34:40-03:00"
+    }
+  ],
+  "success": true
+}
+```
+
+---
+
+## Approve or reject join requests
+
+Approves or rejects participants who requested to join the group. Use the `JID` values returned by `/group/requestparticipants` in the `Phone` array.
+
+endpoint: _/group/updaterequestparticipants_
+
+method: **POST**
+
+`Action` must be `"approve"` or `"reject"`.
+
+```
+curl -s -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' -d '{"GroupJID":"120362023605733675@g.us","Phone":["70072425046185@lid"],"Action":"approve"}' http://localhost:8080/group/updaterequestparticipants
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "Details": "Group request participants updated successfully"
+  },
+  "success": true
+}
+```
+
+---
+
+## Set group join approval mode
+
+Enables or disables the requirement that new members be approved by an admin before joining the group.
+
+endpoint: _/group/joinapprovalmode_
+
+method: **POST**
+
+```
+curl -s -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' -d '{"groupjid":"120362023605733675@g.us","mode":true}' http://localhost:8080/group/joinapprovalmode
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "Details": "Group join approval mode updated successfully"
+  },
+  "success": true
+}
+```
+
 # S3 Storage Integration for WuzAPI
 
 ## Overview
@@ -1445,7 +1999,7 @@ Configure S3 storage settings for the authenticated user.
 - `secret_key`: S3 secret access key
 - `path_style`: Use path-style URLs (required for MinIO)
 - `public_url`: Custom public URL for accessing files (optional)
-- `media_delivery`: Delivery method - "base64", "s3", or "both"
+- `media_delivery`: Delivery method - "base64", "s3", "both", or "local"
 - `retention_days`: Days to retain files (0 for no expiration)
 
 ### Get S3 Configuration
