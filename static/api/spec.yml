@@ -2939,6 +2939,11 @@ definitions:
         example: "5491155553935"
       Image:
         type: string
+        description: >-
+          Media source. Accepts a base64 data URL (data:image/...;base64,...),
+          an HTTP(S) URL, or "file:<path>" to read a file from the session's own
+          files directory (files/user_<id>/). file: paths are sandboxed: ".."
+          and absolute paths are rejected.
         example: data:image/jpeg;base64,iVBORw0
       Caption:
         type: string
@@ -2961,6 +2966,11 @@ definitions:
         example: "5491155553935"
       Audio:
         type: string
+        description: >-
+          Media source. Accepts a base64 data URL (data:audio/...;base64,...),
+          an HTTP(S) URL, or "file:<path>" to read a file from the session's own
+          files directory (files/user_<id>/). file: paths are sandboxed: ".."
+          and absolute paths are rejected.
         example: "data:audio/ogg;base64,iVBORw0a"
       Id:
         type: string
@@ -2996,6 +3006,11 @@ definitions:
         example: "5491155553935"
       Video:
         type: string
+        description: >-
+          Media source. Accepts a base64 data URL (data:video/...;base64,...),
+          an HTTP(S) URL, or "file:<path>" to read a file from the session's own
+          files directory (files/user_<id>/). file: paths are sandboxed: ".."
+          and absolute paths are rejected.
         example: "data:video/mp4;base64,iVBORw0"
       Caption:
         type: string
@@ -3021,6 +3036,11 @@ definitions:
         example: "5491155553935"
       Sticker:
         type: string
+        description: >-
+          Media source. Accepts a base64 data URL (data:image/...;base64,...),
+          an HTTP(S) URL, or "file:<path>" to read a file from the session's own
+          files directory (files/user_<id>/). file: paths are sandboxed: ".."
+          and absolute paths are rejected.
         example: "data:image/webp;base64,iVBORw0"
       Id:
         type: string
@@ -3062,6 +3082,11 @@ definitions:
         example: "5491155553935"
       Document:
         type: string
+        description: >-
+          Media source. Accepts a base64 data URL (data:...;base64,...),
+          an HTTP(S) URL, or "file:<path>" to read a file from the session's own
+          files directory (files/user_<id>/). file: paths are sandboxed: ".."
+          and absolute paths are rejected.
         example: data:application/octet-stream;base64,aG9sYSBxdWUKdGFsCmNvbW8KZXN0YXMK
       FileName:
         type: string
