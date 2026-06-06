@@ -841,6 +841,39 @@ func (s *server) GetStatus() http.HandlerFunc {
 	}
 }
 
+// readUserMediaFile resolves a "file:"-prefixed reference against the caller's
+// own files directory (exPath/files/user_<id>) and returns the file bytes.
+// The path is sandboxed to that directory: any reference that escapes it via
+// ".." (or an absolute path) is rejected, so a session cannot read another
+// session's files or arbitrary server files.
+func (s *server) readUserMediaFile(txtid, ref string) ([]byte, error) {
+	rel := strings.TrimSpace(strings.TrimPrefix(ref, "file:"))
+	if rel == "" {
+		return nil, errors.New("empty file path")
+	}
+	base := filepath.Join(s.exPath, "files", "user_"+txtid)
+	full := filepath.Join(base, rel) // Join cleans ".." segments lexically
+	absBase, err := filepath.Abs(base)
+	if err != nil {
+		return nil, err
+	}
+	absFull, err := filepath.Abs(full)
+	if err != nil {
+		return nil, err
+	}
+	if absFull != absBase && !strings.HasPrefix(absFull, absBase+string(os.PathSeparator)) {
+		return nil, errors.New("file path escapes the user directory")
+	}
+	info, err := os.Stat(absFull)
+	if err != nil {
+		return nil, errors.New("file not found in user directory")
+	}
+	if info.IsDir() {
+		return nil, errors.New("path is a directory, not a file")
+	}
+	return os.ReadFile(absFull)
+}
+
 // Sends a document/attachment message
 func (s *server) SendDocument() http.HandlerFunc {
 
@@ -923,8 +956,18 @@ func (s *server) SendDocument() http.HandlerFunc {
 				t.MimeType = ct
 			}
 			filedata = data
+		} else if strings.HasPrefix(t.Document, "file:") {
+			data, ferr := s.readUserMediaFile(txtid, t.Document)
+			if ferr != nil {
+				s.Respond(w, r, http.StatusBadRequest, errors.New(fmt.Sprintf("could not read file: %v", ferr)))
+				return
+			}
+			filedata = data
+			if t.MimeType == "" {
+				t.MimeType = http.DetectContentType(data)
+			}
 		} else {
-			s.Respond(w, r, http.StatusBadRequest, errors.New("document data should start with \"data:\" or be a valid HTTP URL"))
+			s.Respond(w, r, http.StatusBadRequest, errors.New("document data should start with \"data:\", \"file:\" or be a valid HTTP URL"))
 			return
 		}
 
@@ -1101,8 +1144,16 @@ func (s *server) SendAudio() http.HandlerFunc {
 				detectedMime = ct
 			}
 
+		} else if strings.HasPrefix(t.Audio, "file:") {
+			data, ferr := s.readUserMediaFile(txtid, t.Audio)
+			if ferr != nil {
+				s.Respond(w, r, http.StatusBadRequest, errors.New(fmt.Sprintf("could not read file: %v", ferr)))
+				return
+			}
+			filedata = data
+			detectedMime = http.DetectContentType(data)
 		} else {
-			s.Respond(w, r, http.StatusBadRequest, errors.New("audio must be base64 (data:audio/) or valid HTTP URL"))
+			s.Respond(w, r, http.StatusBadRequest, errors.New("audio must be base64 (data:audio/), file: path or valid HTTP URL"))
 			return
 		}
 
@@ -1308,8 +1359,15 @@ func (s *server) SendImage() http.HandlerFunc {
 				return
 			}
 			filedata = parsed.Data
+		} else if strings.HasPrefix(t.Image, "file:") {
+			data, ferr := s.readUserMediaFile(txtid, t.Image)
+			if ferr != nil {
+				s.Respond(w, r, http.StatusBadRequest, errors.New(fmt.Sprintf("could not read file: %v", ferr)))
+				return
+			}
+			filedata = data
 		} else {
-			s.Respond(w, r, http.StatusBadRequest, errors.New("Image data should start with \"data:image/png;base64,\""))
+			s.Respond(w, r, http.StatusBadRequest, errors.New("Image data should start with \"data:image/png;base64,\", \"file:\" or be a valid HTTP URL"))
 			return
 		}
 
@@ -1484,6 +1542,17 @@ func (s *server) SendSticker() http.HandlerFunc {
 			}
 			imgDataURL := dataurl.New(data, mimeType)
 			t.Sticker = imgDataURL.String()
+		} else if strings.HasPrefix(t.Sticker, "file:") {
+			data, ferr := s.readUserMediaFile(txtid, t.Sticker)
+			if ferr != nil {
+				s.Respond(w, r, http.StatusBadRequest, errors.New(fmt.Sprintf("could not read file: %v", ferr)))
+				return
+			}
+			mimeType := http.DetectContentType(data)
+			if !strings.HasPrefix(strings.ToLower(mimeType), "image/") {
+				mimeType = "image/webp"
+			}
+			t.Sticker = dataurl.New(data, mimeType).String()
 		}
 
 		processedData, detectedMimeType, err := processStickerData(
@@ -1658,8 +1727,16 @@ func (s *server) SendVideo() http.HandlerFunc {
 			}
 			filedata = data
 			detectedMimeType = ct
+		} else if strings.HasPrefix(t.Video, "file:") {
+			data, ferr := s.readUserMediaFile(txtid, t.Video)
+			if ferr != nil {
+				s.Respond(w, r, http.StatusBadRequest, errors.New(fmt.Sprintf("could not read file: %v", ferr)))
+				return
+			}
+			filedata = data
+			detectedMimeType = http.DetectContentType(data)
 		} else {
-			s.Respond(w, r, http.StatusBadRequest, errors.New("data should start with \"data:mime/type;base64,\""))
+			s.Respond(w, r, http.StatusBadRequest, errors.New("data should start with \"data:mime/type;base64,\", \"file:\" or be a valid HTTP URL"))
 			return
 		}
 
@@ -8298,4 +8375,3 @@ func (s *server) publishSentMessageEvent(token, userID, txtid string, recipient 
 	// Publish directly to RabbitMQ (bypassing subscription check for sent messages)
 	go sendToGlobalRabbit(jsonData, token, userID)
 }
-
