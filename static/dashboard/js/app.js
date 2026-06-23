@@ -185,28 +185,46 @@ document.addEventListener('DOMContentLoaded', function() {
 
   document.getElementById('pairphoneinput').addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
-      const phone = pairPhoneInput.value.trim();
+      const phone = e.target.value.trim();
       if (phone) {
-        connect().then((data) => {
-          if(data.success==true) {
-            pairPhone(phone)
-              .then((data) => {
-                document.getElementById('pairHelp').classList.add('hidden');;
-                // Success case
-                if (data.success && data.data && data.data.LinkingCode) {
-                  document.getElementById('pairInfo').innerHTML = `Your link code is: ${data.data.LinkingCode}`;
-                  scanInterval = setInterval(checkStatus, 1000);
-                } else {
-                  document.getElementById('pairInfo').innerHTML = "Problem getting pairing code";
-                }
-              })
-              .catch((error) => {
-                // Error case
-                document.getElementById('pairInfo').innerHTML = "Problem getting pairing code";
-                console.error('Pairing error:', error);
-              });
-          }
-      });
+        // Request the pairing code, retrying a few times to cover the race
+        // where connect() returns before startClient() has opened the
+        // websocket (the backend needs an active connection to pair).
+        const requestCode = (attempt = 1) => {
+          const maxAttempts = 4;
+          pairPhone(phone)
+            .then((data) => {
+              // Success case
+              if (data.success && data.data && data.data.LinkingCode) {
+                document.getElementById('pairHelp').classList.add('hidden');
+                document.getElementById('pairInfo').innerHTML = `Your link code is: ${data.data.LinkingCode}`;
+                // The updateUser() polling loop (running at updateInterval)
+                // already refreshes the connection state once the phone pairs.
+                return;
+              }
+              // "already paired" is a definitive answer — do not retry.
+              const err = (data.error || '').toLowerCase();
+              if (err.indexOf('already paired') === -1 && attempt < maxAttempts) {
+                document.getElementById('pairInfo').innerHTML = 'Connecting, requesting pairing code...';
+                setTimeout(() => requestCode(attempt + 1), 1500);
+                return;
+              }
+              document.getElementById('pairHelp').classList.add('hidden');
+              document.getElementById('pairInfo').innerHTML = `Problem getting pairing code: ${data.error || 'unknown error'}`;
+            })
+            .catch((error) => {
+              if (attempt < maxAttempts) {
+                setTimeout(() => requestCode(attempt + 1), 1500);
+                return;
+              }
+              document.getElementById('pairInfo').innerHTML = "Problem getting pairing code";
+              console.error('Pairing error:', error);
+            });
+        };
+        // Ensure the websocket is open, then request the pairing code.
+        // A successful connect OR an "already connected" session are both fine
+        // to proceed with pairing, so we request the code regardless.
+        connect().then(() => requestCode()).catch(() => requestCode());
       }
     }
   });
