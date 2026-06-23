@@ -1054,6 +1054,48 @@ paths:
             application/json:
               schema:
                 example: { "code": 200, "data": { "Details": "Message deleted" }, "success": true }
+  /chat/deleteforme:
+    post:
+      tags:
+        - Chat
+      summary: Deletes a message only for the user (delete for me)
+      description: Deletes a single message only on the authenticated user's own devices (the "Delete for me" action in WhatsApp). The message stays visible for everyone else in the chat. Works for both messages you sent (from_me true) and messages you received (from_me false). For received group messages, set sender to the participant JID that sent the message.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/definitions/DeleteMessageForMe'
+      responses:
+        200:
+          description: Response
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "success": true, "message": "Message deleted for me", "jid": "5491155553934@s.whatsapp.net", "message_id": "3EB06F9067F80BAB89FF" }, "success": true }
+  /chat/deletechat:
+    post:
+      tags:
+        - Chat
+      summary: Deletes an entire chat (delete chat)
+      description: Removes a whole conversation from the authenticated user's own devices (the "Delete chat" action in WhatsApp). It does not affect the other party's chat.
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/definitions/DeleteChat'
+      responses:
+        200:
+          description: Response
+          content:
+            application/json:
+              schema:
+                example: { "code": 200, "data": { "success": true, "message": "Chat deleted" }, "success": true }
   /chat/markread:
     post:
       tags:
@@ -3322,6 +3364,49 @@ definitions:
       Phone:
         type: string
         example: "5491155553934"
+  DeleteMessageForMe:
+    type: object
+    required:
+      - jid
+      - message_id
+    properties:
+      jid:
+        type: string
+        example: "5491155553934@s.whatsapp.net"
+        description: "Chat JID where the message is"
+      message_id:
+        type: string
+        example: "3EB06F9067F80BAB89FF"
+        description: "ID of the message to delete for me"
+      from_me:
+        type: boolean
+        example: false
+        description: "true if the message was sent by you, false if received. Defaults to false."
+      sender:
+        type: string
+        example: "5491155553111@s.whatsapp.net"
+        description: "Only for received group messages: the participant JID that sent the message. Omit for direct chats."
+      delete_media:
+        type: boolean
+        example: false
+        description: "true to also delete the downloaded media of the message. Defaults to false."
+      timestamp:
+        type: integer
+        example: 1718900000
+        description: "Original message timestamp (unix seconds). Optional, defaults to now."
+  DeleteChat:
+    type: object
+    required:
+      - jid
+    properties:
+      jid:
+        type: string
+        example: "5491155553934@s.whatsapp.net"
+        description: "Chat JID to delete"
+      delete_media:
+        type: boolean
+        example: false
+        description: "true to also delete the chat's downloaded media. Defaults to false."
   Markread:
     type: object
     required:

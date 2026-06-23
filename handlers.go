@@ -31,6 +31,7 @@ import (
 
 	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waE2E"
+	"go.mau.fi/whatsmeow/proto/waSyncAction"
 
 	"go.mau.fi/whatsmeow/appstate"
 	"go.mau.fi/whatsmeow/types"
@@ -7695,6 +7696,178 @@ func (s *server) ArchiveChat() http.HandlerFunc {
 		}
 	}
 
+}
+
+// DeleteChat removes an entire conversation from all of the user's own devices
+// (the "Delete chat" action in WhatsApp). It does not affect the other party.
+func (s *server) DeleteChat() http.HandlerFunc {
+
+	type deleteChatStruct struct {
+		Jid         string `json:"jid"`
+		DeleteMedia bool   `json:"delete_media"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		txtid := r.Context().Value("userinfo").(Values).Get("Id")
+
+		client := clientManager.GetWhatsmeowClient(txtid)
+		if client == nil {
+			s.Respond(w, r, http.StatusInternalServerError, errors.New("no session"))
+			return
+		}
+
+		decoder := json.NewDecoder(r.Body)
+		var t deleteChatStruct
+		err := decoder.Decode(&t)
+		if err != nil {
+			s.Respond(w, r, http.StatusBadRequest, errors.New("could not decode Payload"))
+			return
+		}
+
+		if t.Jid == "" {
+			s.Respond(w, r, http.StatusBadRequest, errors.New("missing jid in Payload"))
+			return
+		}
+
+		chatJID, err := types.ParseJID(t.Jid)
+		if err != nil {
+			s.Respond(w, r, http.StatusBadRequest, errors.New("invalid Chat JID format"))
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		err = client.SendAppState(ctx, appstate.BuildDeleteChat(chatJID, time.Time{}, nil, t.DeleteMedia))
+		if err != nil {
+			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("failed to delete chat: %s", err)))
+			return
+		}
+
+		log.Info().Str("jid", t.Jid).Msg("Chat deleted")
+		response := map[string]interface{}{
+			"success": true,
+			"message": "Chat deleted",
+		}
+		responseJson, err := json.Marshal(response)
+		if err != nil {
+			s.Respond(w, r, http.StatusInternalServerError, err)
+		} else {
+			s.Respond(w, r, http.StatusOK, string(responseJson))
+		}
+	}
+}
+
+// DeleteMessageForMe deletes a single message only on the user's own devices
+// (the "Delete for me" action in WhatsApp). The message remains for everyone else.
+//
+// whatsmeow does not ship a builder for this app state mutation, so the patch is
+// assembled manually following the reference Baileys implementation:
+// index = ["deleteMessageForMe", chatJID, messageID, fromMe, sender], version 3.
+func (s *server) DeleteMessageForMe() http.HandlerFunc {
+
+	type deleteForMeStruct struct {
+		Jid         string `json:"jid"`
+		MessageID   string `json:"message_id"`
+		FromMe      bool   `json:"from_me"`
+		Sender      string `json:"sender"`
+		DeleteMedia bool   `json:"delete_media"`
+		Timestamp   int64  `json:"timestamp"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		txtid := r.Context().Value("userinfo").(Values).Get("Id")
+
+		client := clientManager.GetWhatsmeowClient(txtid)
+		if client == nil {
+			s.Respond(w, r, http.StatusInternalServerError, errors.New("no session"))
+			return
+		}
+
+		decoder := json.NewDecoder(r.Body)
+		var t deleteForMeStruct
+		err := decoder.Decode(&t)
+		if err != nil {
+			s.Respond(w, r, http.StatusBadRequest, errors.New("could not decode Payload"))
+			return
+		}
+
+		if t.Jid == "" {
+			s.Respond(w, r, http.StatusBadRequest, errors.New("missing jid in Payload"))
+			return
+		}
+		if t.MessageID == "" {
+			s.Respond(w, r, http.StatusBadRequest, errors.New("missing message_id in Payload"))
+			return
+		}
+
+		chatJID, err := types.ParseJID(t.Jid)
+		if err != nil {
+			s.Respond(w, r, http.StatusBadRequest, errors.New("invalid Chat JID format"))
+			return
+		}
+
+		fromMe := "0"
+		if t.FromMe {
+			fromMe = "1"
+		}
+
+		// senderIdx is "0" for direct chats / own messages; for a received group
+		// message it must be the participant JID that sent the message.
+		senderIdx := "0"
+		if t.Sender != "" {
+			senderJID, err := types.ParseJID(t.Sender)
+			if err != nil {
+				s.Respond(w, r, http.StatusBadRequest, errors.New("invalid Sender JID format"))
+				return
+			}
+			if senderJID.User != chatJID.User {
+				senderIdx = senderJID.String()
+			}
+		}
+
+		messageTimestamp := t.Timestamp
+		if messageTimestamp == 0 {
+			messageTimestamp = time.Now().Unix()
+		}
+
+		patch := appstate.PatchInfo{
+			Type: appstate.WAPatchRegularHigh,
+			Mutations: []appstate.MutationInfo{{
+				Index:   []string{appstate.IndexDeleteMessageForMe, chatJID.String(), t.MessageID, fromMe, senderIdx},
+				Version: 3,
+				Value: &waSyncAction.SyncActionValue{
+					DeleteMessageForMeAction: &waSyncAction.DeleteMessageForMeAction{
+						DeleteMedia:      proto.Bool(t.DeleteMedia),
+						MessageTimestamp: proto.Int64(messageTimestamp),
+					},
+				},
+			}},
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		err = client.SendAppState(ctx, patch)
+		if err != nil {
+			s.Respond(w, r, http.StatusInternalServerError, errors.New(fmt.Sprintf("failed to delete message for me: %s", err)))
+			return
+		}
+
+		log.Info().Str("jid", t.Jid).Str("message_id", t.MessageID).Msg("Message deleted for me")
+		response := map[string]interface{}{
+			"success":    true,
+			"message":    "Message deleted for me",
+			"jid":        t.Jid,
+			"message_id": t.MessageID,
+		}
+		responseJson, err := json.Marshal(response)
+		if err != nil {
+			s.Respond(w, r, http.StatusInternalServerError, err)
+		} else {
+			s.Respond(w, r, http.StatusOK, string(responseJson))
+		}
+	}
 }
 
 // Downloads Sticker and returns base64 representation

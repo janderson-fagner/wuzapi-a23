@@ -105,6 +105,8 @@ func (s *server) routes() {
 
 	s.router.Handle("/chat/send/text", c.Then(s.SendMessage())).Methods("POST")
 	s.router.Handle("/chat/delete", c.Then(s.DeleteMessage())).Methods("POST")
+	s.router.Handle("/chat/deleteforme", c.Then(s.DeleteMessageForMe())).Methods("POST")
+	s.router.Handle("/chat/deletechat", c.Then(s.DeleteChat())).Methods("POST")
 	s.router.Handle("/chat/send/image", c.Then(s.SendImage())).Methods("POST")
 	s.router.Handle("/chat/send/audio", c.Then(s.SendAudio())).Methods("POST")
 	s.router.Handle("/chat/send/document", c.Then(s.SendDocument())).Methods("POST")

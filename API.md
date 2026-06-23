@@ -1321,6 +1321,109 @@ Response:
 
 ---
 
+## Delete message for everyone
+
+Deletes a message for everyone in the chat (the "Delete for everyone" action in WhatsApp). Only works for messages you sent.
+
+endpoint: _/chat/delete_
+
+method: **POST**
+
+| Param | Required | Description |
+|-------|----------|-------------|
+| Phone | Yes      | Chat phone/JID where the message is |
+| Id    | Yes      | ID of the message to delete |
+
+```
+curl -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' --data '{"Phone":"5491155553934","Id":"3EB06F9067F80BAB89FF"}' http://localhost:8080/chat/delete
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "Details": "Deleted",
+    "Id": "3EB06F9067F80BAB89FF",
+    "Timestamp": 1718900000
+  },
+  "success": true
+}
+```
+
+---
+
+## Delete message for me
+
+Deletes a single message only on your own devices (the "Delete for me" action in WhatsApp). The message stays visible for everyone else in the chat. Works for both messages you sent (`from_me` true) and received (`from_me` false). For received **group** messages, set `sender` to the participant JID that sent the message.
+
+endpoint: _/chat/deleteforme_
+
+method: **POST**
+
+| Param        | Required | Description |
+|--------------|----------|-------------|
+| jid          | Yes      | Chat JID where the message is |
+| message_id   | Yes      | ID of the message to delete for me |
+| from_me      | No       | `true` if the message was sent by you, `false` if received. Defaults to `false` |
+| sender       | No       | For received group messages: the participant JID that sent the message. Omit for direct chats |
+| delete_media | No       | `true` to also delete the downloaded media. Defaults to `false` |
+| timestamp    | No       | Original message timestamp (unix seconds). Defaults to now |
+
+```
+curl -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' --data '{"jid":"5491155553934@s.whatsapp.net","message_id":"3EB06F9067F80BAB89FF","from_me":false}' http://localhost:8080/chat/deleteforme
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "success": true,
+    "message": "Message deleted for me",
+    "jid": "5491155553934@s.whatsapp.net",
+    "message_id": "3EB06F9067F80BAB89FF"
+  },
+  "success": true
+}
+```
+
+---
+
+## Delete chat
+
+Removes an entire conversation from your own devices (the "Delete chat" action in WhatsApp). It does not affect the other party's chat.
+
+endpoint: _/chat/deletechat_
+
+method: **POST**
+
+| Param        | Required | Description |
+|--------------|----------|-------------|
+| jid          | Yes      | Chat JID to delete |
+| delete_media | No       | `true` to also delete the chat's downloaded media. Defaults to `false` |
+
+```
+curl -X POST -H 'Token: 1234ABCD' -H 'Content-Type: application/json' --data '{"jid":"5491155553934@s.whatsapp.net"}' http://localhost:8080/chat/deletechat
+```
+
+Response:
+
+```json
+{
+  "code": 200,
+  "data": {
+    "success": true,
+    "message": "Chat deleted"
+  },
+  "success": true
+}
+```
+
+---
+
 ## Labels
 
 The following _label_ endpoints allow you to manage WhatsApp labels (available on WhatsApp Business).
